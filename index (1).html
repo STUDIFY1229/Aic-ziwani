@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIC ZIWANI Projection System</title>
+<style>
+body {margin:0;font-family:"Poppins",sans-serif;background:black;color:white;overflow:hidden;}
+header {background:linear-gradient(90deg,#111,#333);padding:15px;display:flex;flex-wrap:wrap;gap:10px;border-bottom:2px solid #ffd700;justify-content:center;}
+button, select {padding:10px 15px;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
+button {background:#ffd700;color:#111;transition:0.3s;}
+button:hover {background:#ffcc00;transform:translateY(-2px);}
+select {background:#111;color:#fff;border:2px solid #ffd700;}
+.editor {display:flex;flex-direction:column;align-items:center;padding:20px;}
+h2 {color:#ffd700;text-shadow:0 0 5px #ffcc00;}
+textarea {width:80%;height:150px;font-size:18px;margin:10px 0;border-radius:10px;border:2px solid #ffd700;padding:12px;background:#111;color:#fff;resize:none;}
+.saved-list {margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.saved-item {background:#222;padding:10px 15px;border-radius:6px;width:80%;display:flex;justify-content:space-between;align-items:center;font-size:16px;}
+.saved-item button {background:crimson;color:white;font-size:14px;padding:5px 10px;border-radius:5px;box-shadow:none;}
+.display-area {display:none;text-align:center;padding:60px 5vw;line-height:1.6;overflow:hidden;height:calc(100vh - 80px);position:relative;}
+.scrolling {position:absolute;width:90%;left:50%;transform:translateX(-50%);text-align:center;animation:scrollUp linear infinite;word-wrap:break-word;white-space:normal;}
+@keyframes scrollUp {0% {top:100%;} 100% {top:-100%;}}
+.marquee {position:fixed;bottom:0;width:100%;background:#111;border-top:2px solid #ffd700;white-space:nowrap;overflow:hidden;text-align:center;}
+.marquee span {display:inline-block;padding-left:100%;color:#ffd700;font-size:28px;animation:marquee 15s linear infinite;}
+@keyframes marquee {0% {transform:translate(0,0);}100% {transform:translate(-100%,0);}}
+.control-bar {position:fixed;bottom:60px;left:50%;transform:translateX(-50%);display:none;gap:10px;flex-wrap:wrap;justify-content:center;}
+.hidden {display:none !important;}
+</style>
+</head>
+<body>
+
+<header id="toolbar">
+  <button onclick="showEditor('marquee')">🏃 Edit Marquee</button>
+  <button onclick="showEditor('verse')">📖 Edit Verse</button>
+  <button onclick="showEditor('song')">🎵 Edit Song</button>
+  <button onclick="showEditor('announce')">📢 Edit Announcement</button>
+  <button onclick="fetchBibleVerse()">📖 Fetch Bible Verse</button>
+
+  <select id="displaySelect">
+    <option value="marquee">Marquee</option>
+    <option value="verse">Verse</option>
+    <option value="song">Song</option>
+    <option value="announce">Announcement</option>
+  </select>
+  <button onclick="displayMode()">🎬 Display</button>
+  <button onclick="previousItem()">⏮ Previous</button>
+  <button onclick="nextItem()">⏭ Next</button>
+</header>
+
+<div id="editor" class="editor">
+  <h2 id="editTitle">Edit Content</h2>
+  <textarea id="editBox" placeholder="Type your text here..."></textarea>
+  <button onclick="saveContent()">💾 Save</button>
+  <div class="saved-list" id="savedList"></div>
+</div>
+
+<div id="displayArea" class="display-area"></div>
+
+<div id="controlBar" class="control-bar">
+  <button onclick="changeSpeed(-2)">⏪ Slower</button>
+  <button onclick="pauseScroll()">⏸ Pause</button>
+  <button onclick="resumeScroll()">▶ Resume</button>
+  <button onclick="changeSpeed(2)">⏩ Faster</button>
+  <button onclick="zoomText(4)">🔍 Zoom In</button>
+  <button onclick="zoomText(-4)">🔎 Zoom Out</button>
+  <button onclick="changeFont()">🔤 Change Font</button>
+  <button onclick="toggleProjectorMode()">🖥️ Projector Mode</button>
+</div>
+
+<div class="marquee">
+  <span id="marqueeText">WELCOME TO AIC ZIWANI • PRAISE AND WORSHIP SERVICE • 29 SEPTEMBER 2025</span>
+</div>
+
+<script>
+let currentSection="", scrollDuration=20, scrollingDiv=null, fontSize=36, currentFontIndex=0, projectorMode=false, currentIndex=0;
+const savedKeys=['marquee','verse','song','announce'];
+const sectionData={}, fonts=["Poppins, sans-serif","Georgia, serif","'Courier New', monospace","'Brush Script MT', cursive","Verdana, sans-serif"];
+
+// Load from localStorage
+savedKeys.forEach(sec=>{ sectionData[sec]=JSON.parse(localStorage.getItem(sec)||"[]"); });
+updateSavedList();
+
+// Editor functions
+function showEditor(section){
+  currentSection=section;
+  document.getElementById('editor').style.display='flex';
+  document.getElementById('displayArea').style.display='none';
+  document.getElementById('controlBar').style.display='none';
+  const titles={marquee:'🏃 Edit Marquee',verse:'📖 Edit Verse',song:'🎵 Edit Song',announce:'📢 Edit Announcement'};
+  document.getElementById('editTitle').textContent=titles[section];
+  document.getElementById('editBox').value=(sectionData[section]||[]).join("\n---\n");
+}
+
+function saveContent(){
+  if(!currentSection) return;
+  const items=document.getElementById('editBox').value.split(/\n---\n/).map(s=>s.trim()).filter(s=>s);
+  sectionData[currentSection]=items;
+  localStorage.setItem(currentSection,JSON.stringify(items));
+  if(currentSection==='marquee' && items.length>0) document.getElementById('marqueeText').textContent=items[0];
+  updateSavedList();
+  alert("✅ Saved!");
+}
+
+function updateSavedList(){
+  const list=document.getElementById('savedList'); list.innerHTML='';
+  savedKeys.forEach(sec=>{
+    (sectionData[sec]||[]).forEach((item,i)=>{
+      const div=document.createElement('div'); div.className='saved-item';
+      div.innerHTML=`<span><strong>${sec.toUpperCase()} ${i+1}</strong>: ${item.substring(0,30)}...</span>
+      <button onclick="deleteItem('${sec}',${i})">🗑 Delete</button>`;
+      list.appendChild(div);
+    });
+  });
+}
+
+function deleteItem(sec,index){ if(confirm("Delete this item?")){ sectionData[sec].splice(index,1); localStorage.setItem(sec,JSON.stringify(sectionData[sec])); updateSavedList(); } }
+
+// Display Mode for projector
+function displayMode(){
+  const sel=document.getElementById('displaySelect').value;
+  currentSection=sel;
+  if(!(sectionData[sel] && sectionData[sel].length>0)){ alert("⚠ No items"); return;}
+  currentIndex=0;
+  projectorMode=true;
+  document.getElementById('toolbar').classList.add('hidden');
+  document.getElementById('editor').classList.add('hidden');
+  document.getElementById('controlBar').style.display='flex';
+  showCurrentItem();
+}
+
+function showCurrentItem(){
+  const items=sectionData[currentSection]; if(!items || items.length===0) return;
+  const content=items[currentIndex];
+  scrollDuration=Math.max(20, content.length/5);
+  const display=document.getElementById('displayArea');
+  display.style.display='block';
+  display.innerHTML=`<div class='scrolling' id='scrollingDiv' style='animation-duration:${scrollDuration}s;font-size:${fontSize}px;font-family:${fonts[currentFontIndex]};'>${content.replace(/\n/g,"<br>")}</div>`;
+  scrollingDiv=document.getElementById('scrollingDiv');
+}
+
+// Navigation
+function nextItem(){ const items=sectionData[currentSection]; if(!items||items.length===0) return; currentIndex=(currentIndex+1)%items.length; showCurrentItem(); }
+function previousItem(){ const items=sectionData[currentSection]; if(!items||items.length===0) return; currentIndex=(currentIndex-1+items.length)%items.length; showCurrentItem(); }
+
+// Controls
+function changeSpeed(chg){ if(scrollingDiv){ scrollDuration=Math.max(5,scrollDuration+chg); scrollingDiv.style.animationDuration=`${scrollDuration}s`; } }
+function pauseScroll(){ if(scrollingDiv) scrollingDiv.style.animationPlayState="paused"; }
+function resumeScroll(){ if(scrollingDiv) scrollingDiv.style.animationPlayState="running"; }
+function zoomText(chg){ fontSize=Math.max(20,fontSize+chg); if(scrollingDiv) scrollingDiv.style.fontSize=`${fontSize}px`; }
+function changeFont(){ currentFontIndex=(currentFontIndex+1)%fonts.length; if(scrollingDiv) scrollingDiv.style.fontFamily=fonts[currentFontIndex]; }
+function toggleProjectorMode(){ projectorMode=!projectorMode; document.getElementById('toolbar').classList.toggle('hidden',projectorMode); document.getElementById('controlBar').classList.toggle('hidden',projectorMode); }
+
+// Fetch Bible Verse
+async function fetchBibleVerse(){
+  const ref=prompt("Enter Bible reference (e.g., John 3:16):"); if(!ref) return;
+  try{
+    const res=await fetch(`https://bible-api.com/${encodeURIComponent(ref)}`);
+    if(!res.ok) throw new Error("Verse not found!");
+    const data=await res.json();
+    const verse=`${ref}: ${data.text}`;
+    if(!sectionData['verse']) sectionData['verse']=[];
+    sectionData['verse'].push(verse);
+    localStorage.setItem('verse',JSON.stringify(sectionData['verse']));
+    updateSavedList(); alert("✅ Verse added!");
+  } catch(e){ alert("⚠ Error: "+e.message); }
+}
+
+// Exit projector
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ projectorMode=false; document.getElementById('toolbar').classList.remove('hidden'); document.getElementById('controlBar').classList.remove('hidden'); } });
+document.addEventListener("dblclick",()=>{ if(projectorMode){ projectorMode=false; document.getElementById('toolbar').classList.remove('hidden'); document.getElementById('controlBar').classList.remove('hidden'); } });
+</script>
+
+</body>
+</html>
